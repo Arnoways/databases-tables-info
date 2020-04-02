@@ -104,6 +104,8 @@ class Postgresql(Dbms):
                 self.close_connection()
             except Exception as e:
                 logging.error(e)
+                self.close_connection()
+                exit(1)
             finally:
                 self.close_connection()
         return results
@@ -155,6 +157,8 @@ class Mysql(Dbms):
             self.close_connection()
         except Exception as e:
             logging.error(e)
+            self.close_connection()
+            exit(1)
         finally:
             self.close_connection()
         return query_results
@@ -168,6 +172,7 @@ def display_information(results):
             wr.writerow(t)
         except Exception as e:
             logging.error(e)
+            return 1
 
 
 def main():
