@@ -1,0 +1,8 @@
+Pipfile
+MysqlFile
+Dockerfile
+requirements.txt
+.my.cnf
+.pgpass
+.idea
+.vscode
