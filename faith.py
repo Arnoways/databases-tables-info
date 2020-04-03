@@ -184,6 +184,7 @@ def main():
         "--software-type",
         dest="software_type",
         required=True,
+        choices=["mysql", "postgresql"],
         help="Software type (mysql or postgresql)",
     )
     parser.add_argument(
@@ -226,9 +227,6 @@ def main():
         dbms = Postgresql(args.exclusions)
     elif args.software_type == "mysql":
         dbms = Mysql(args.exclusions)
-    else:
-        logging.error("Unsupported dbms type: {}".format(args.software_type))
-        return 1
     results = dbms.fetch_information()
     if results:
         display_information(results)
