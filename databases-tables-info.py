@@ -53,9 +53,10 @@ class Postgresql(Dbms):
     def remove_exclusions(self):
         self.db_list = [db for db in self.db_list if db not in self.exclusions]
         if not self.db_list:
-            raise Exception(
+            logging.warning(
                 "The database list to retrieve information from is empty, can not go further."
             )
+            exit(0)
 
     def list_databases(self, dbname):
         list_database_query = "select datname from pg_database;"
