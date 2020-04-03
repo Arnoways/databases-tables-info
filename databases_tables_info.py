@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# https://github.com/Arnoways/databases-tables-info
+
 import logging
 import csv
 import argparse
@@ -8,9 +10,11 @@ from sys import stdout
 
 
 class Dbms:
-    def __init__(self, exclusions):
-        self.exclusions = exclusions
-        logging.debug("Excluding {} databases".format(self.exclusions))
+    def __init__(self, db_exclusions, tables_exclusions):
+        self.db_exclusions = db_exclusions
+        logging.debug("Excluding {} databases".format(self.db_exclusions))
+        self.tables_exclusions = tables_exclusions
+        logging.debug("Excluding {} tables.".format(self.tables_exclusions))
         self.conn = None
         self.cursor = None
         self.db_list = None
@@ -32,11 +36,11 @@ class Dbms:
 
 
 class Postgresql(Dbms):
-    def __init__(self, exclusions):
+    def __init__(self, db_exclusions, tables_exclusions):
         pg_exclusions = ["template0", "template1", "postgres"]
-        if exclusions:
-            pg_exclusions.extend(exclusions)
-        super().__init__(pg_exclusions)
+        if db_exclusions:
+            pg_exclusions.extend(db_exclusions)
+        super().__init__(pg_exclusions, tables_exclusions)
 
     def init_connection(self, dbname):
         import psycopg2
@@ -51,7 +55,7 @@ class Postgresql(Dbms):
             self.close_connection()
 
     def remove_exclusions(self):
-        self.db_list = [db for db in self.db_list if db not in self.exclusions]
+        self.db_list = [db for db in self.db_list if db not in self.db_exclusions]
         if not self.db_list:
             logging.warning(
                 "The database list to retrieve information from is empty, can not go further."
@@ -85,10 +89,17 @@ class Postgresql(Dbms):
         self.list_databases("postgres")
         self.remove_exclusions()
         results = []
+        exclude_table_query = ""
+        if self.tables_exclusions:
+            exclude_table_query = " and table_name not in ({})".format(
+                str(self.tables_exclusions)[1:-1]
+            )
         get_info_query = (
             "select current_database(), table_name, pg_relation_size(quote_ident(table_name)),"
             " pg_class.reltuples from information_schema.tables INNER JOIN pg_class ON "
-            "information_schema.tables.table_name=pg_class.relname where table_schema = 'public';"
+            "information_schema.tables.table_name=pg_class.relname where table_schema = 'public'"
+            + exclude_table_query
+            + ";"
         )
         for db in self.db_list:
             try:
@@ -113,7 +124,7 @@ class Postgresql(Dbms):
 
 
 class Mysql(Dbms):
-    def __init__(self, exclusions):
+    def __init__(self, db_exclusions, tables_exclusions):
         mysql_exclusions = [
             "information_schema",
             "performance_schema",
@@ -121,9 +132,9 @@ class Mysql(Dbms):
             "mysql",
             "mysql_innodb_cluster_metadata",
         ]
-        if exclusions:
-            mysql_exclusions.extend(exclusions)
-        super().__init__(mysql_exclusions)
+        if db_exclusions:
+            mysql_exclusions.extend(db_exclusions)
+        super().__init__(mysql_exclusions, tables_exclusions)
 
     def init_connection(self):
         import MySQLdb
@@ -144,11 +155,15 @@ class Mysql(Dbms):
 
     def fetch_information(self):
         query_results = None
-        get_info_query = (
-            "select table_schema, table_name, data_length, table_rows FROM "
-            "information_schema.tables WHERE table_schema NOT IN {};".format(
-                tuple(self.exclusions)
+        exclude_table_query = ""
+        if self.tables_exclusions:
+            exclude_table_query = " table_name not in ({}) and".format(
+                str(self.tables_exclusions)[1:-1]
             )
+        get_info_query = (
+            "select table_schema, table_name, data_length, table_rows FROM information_schema.tables WHERE"
+            + exclude_table_query
+            + " table_schema NOT IN ({});".format(str(self.db_exclusions)[1:-1])
         )
         try:
             self.init_connection()
@@ -189,11 +204,16 @@ def main():
         help="Software type (mysql or postgresql)",
     )
     parser.add_argument(
-        "-e",
-        "--exclude",
+        "--exclude-db",
         action="append",
-        dest="exclusions",
-        help="Exclude databases from the list.",
+        dest="db_exclusions",
+        help="Exclude specific databases from the list.",
+    )
+    parser.add_argument(
+        "--exclude-table",
+        action="append",
+        dest="tables_exclusions",
+        help="Exclude specific tables from the list.",
     )
     parser.add_argument(
         "-d",
@@ -225,9 +245,9 @@ def main():
     logging.basicConfig(level=args.loglevel)
 
     if args.software_type == "postgresql":
-        dbms = Postgresql(args.exclusions)
+        dbms = Postgresql(args.db_exclusions, args.tables_exclusions)
     elif args.software_type == "mysql":
-        dbms = Mysql(args.exclusions)
+        dbms = Mysql(args.db_exclusions, args.tables_exclusions)
     results = dbms.fetch_information()
     if results:
         display_information(results)
