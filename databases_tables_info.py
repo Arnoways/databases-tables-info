@@ -96,8 +96,8 @@ class Postgresql(Dbms):
             )
         get_info_query = (
             "select current_database(), table_name, pg_relation_size(quote_ident(table_name)),"
-            " pg_class.reltuples from information_schema.tables INNER JOIN pg_class ON "
-            "information_schema.tables.table_name=pg_class.relname where table_schema = 'public'"
+            "pg_indexes_size(quote_ident(table_name)), pg_class.reltuples from information_schema.tables INNER JOIN "
+            "pg_class ON information_schema.tables.table_name=pg_class.relname where table_schema = 'public'"
             + exclude_table_query
             + ";"
         )
@@ -161,7 +161,7 @@ class Mysql(Dbms):
                 str(self.tables_exclusions)[1:-1]
             )
         get_info_query = (
-            "select table_schema, table_name, data_length, table_rows FROM information_schema.tables WHERE"
+            "select table_schema, table_name, data_length, index_length, table_rows FROM information_schema.tables WHERE"
             + exclude_table_query
             + " table_schema NOT IN ({});".format(str(self.db_exclusions)[1:-1])
         )
@@ -182,7 +182,7 @@ class Mysql(Dbms):
 
 def display_information(results):
     wr = csv.writer(stdout)
-    print("database_name,table_name,table_size,table_rows")
+    print("database_name,table_name,table_size,index_size,table_rows")
     for t in results:
         try:
             wr.writerow(t)
